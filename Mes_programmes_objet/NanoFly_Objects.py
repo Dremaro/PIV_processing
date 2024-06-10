@@ -99,13 +99,14 @@ class GestionnaireDonnees:
             dill.load_session(name)
 
     def save_session(self, save_path=None, name="session.db"):
-        print(save_path)
         if save_path is not None:
             os.makedirs(save_path, exist_ok=True)
             path = os.path.join(save_path, name)
             dill.dump_session(path)
+            print(f"Session saved in {path}, as {name}")
         else:
             dill.dump_session('session.db')
+            print(f"Session saved in {save_path} as session.db")
 
 
 class ImageProcessing:
@@ -172,22 +173,33 @@ class ImageProcessing:
             self.flatten_mp.append(l_mp_uv)
         self.vitesses = vitesses_interpolees
 
-    def mesurer_periode(self,l_image, show_name=False):
+    def mesurer_periode(self,l_image, l_info, show_name=False):
+        # Pour éviter de devoir refaire le calcul à chaque fois, un utilise des listes d'informations
+        # pour stocker les résultats.
+        if len(l_info) != 0:
+            print("Une liste d'informations a été fournie :", l_info)
+            self.n_periodes = l_info[0]
+            self.n_images = l_info[1]
+            self.T_mean = self.n_images / self.n_periodes
+            print(f"Nombre d'images moyen par période : {self.T_mean}")
+            input("Confirmer ?")
 
-        # print("La liste d'information de ce fichier est vide, vous devez la remplir manuellement.")
-        print("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ")
-        print("Vous pouvez maintenant compter le nombre d'images ayant défilé et le nombre de périodes,\nveillez à compter les images pour un nombre entier de périodes")
-        print("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ")
-        l_image_255 = Fu.normalize_to_255(l_image)
-
-        root = tk.Tk()
-        browser = ImageBrowser(root, l_images = l_image_255, show_name=show_name)
-        root.mainloop()
-        self.n_images = int(input("Nombre d'images ayant défilé : "))
-        self.n_periodes = int(input("Nombre de périodes : "))
-        self.T_mean = self.n_images / self.n_periodes
-        print(f"Nombre d'images moyen par période : {self.T_mean}")
-        input("Appuyez sur une touche pour valider le nombre d'images moyen par période et continuer... ")
+        else :
+            print("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ")
+            print("Vous pouvez maintenant compter le nombre d'images ayant défilé et le nombre de périodes,\nveillez à compter les images pour un nombre entier de périodes")
+            print("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ")
+            l_image_255 = Fu.normalize_to_255(l_image)
+            # print(np.amax(l_image_255), np.amin(l_image_255.all()))
+            
+            root = tk.Tk()
+            browser = ImageBrowser(root, l_images = l_image_255, show_name=show_name)
+            root.mainloop()
+            self.n_images = int(input("Nombre d'images ayant défilé : "))
+            self.n_periodes = int(input("Nombre de périodes : "))
+            self.T_mean = self.n_images / self.n_periodes
+            print(f"Nombre d'images moyen par période : {self.T_mean}")
+            input("Appuyez sur une touche pour valider le nombre d'images moyen par période et continuer... ")
+            
 
     def moyenner_les_images_sur_le_temps(self, l_image, l_mp):
         """Cette fonction permet de moyenner les images sur le temps."""
@@ -323,8 +335,24 @@ class ImageProcessing:
         return mp_periodes_mean
 
 
+class Visualization:
+    @staticmethod
+    def show_image(image):
+        plt.imshow(image)
+        plt.show()
 
-
+    @staticmethod
+    def scatter_plot(X, Y, C):
+        plt.scatter(X, Y, c=C, cmap='viridis')
+        plt.colorbar()
+        plt.show()
+    
+    @staticmethod
+    def show_2d_array(array):
+        plt.imshow(array, cmap='viridis')
+        plt.colorbar()
+        plt.show()
+    
 
 class ImageBrowser:
     '''
@@ -377,12 +405,16 @@ class ImageBrowser:
         prev_button.grid(row=1, column=0)
         prev10_button = tk.Button(master, text="<< Prev 10", command=self.prev10)
         prev10_button.grid(row=2, column=0)
+        prev100_button = tk.Button(master, text="<< Prev 100", command=self.prev100)
+        prev100_button.grid(row=3, column=0)
 
         # Next and 10 next buttons
         next_button = tk.Button(master, text="Next >>", command=self.next)
         next_button.grid(row=1, column=2)
         next10_button = tk.Button(master, text="Next 10 >>", command=self.next10)
         next10_button.grid(row=2, column=2)
+        next100_button = tk.Button(master, text="Next 100 >>", command=self.next100)
+        next100_button.grid(row=3, column=2)
 
         # Show the file name file_name_label
         if self.show_n:
@@ -418,6 +450,12 @@ class ImageBrowser:
             self.index = 0
         self.update()
 
+    def next100(self):
+        self.index += 100
+        if self.index >= len(self.files):
+            self.index = 0
+        self.update()
+
     def prev(self):
         self.index -= 1
         if self.index < 0:
@@ -426,6 +464,12 @@ class ImageBrowser:
     
     def prev10(self):
         self.index -= 10
+        if self.index < 0:
+            self.index = len(self.files) - 1
+        self.update()
+
+    def prev100(self):
+        self.index -= 100
         if self.index < 0:
             self.index = len(self.files) - 1
         self.update()
@@ -444,6 +488,8 @@ class ImageBrowser:
                 self.name_label.config(text=self.files[self.index])
             else:
                 self.name_label.config(text="indice n°"+str(self.index))
+
+
 
 class MobilePartProcessing:
     def __init__(self, folder_path, threshold=0.3):
@@ -468,24 +514,6 @@ class MobilePartProcessing:
         for i, part in enumerate(mobile_parts):
             np.savetxt(os.path.join(save_path, f'mean_mobile_part_{i}.csv'), part, delimiter=',')
 
-class Visualization:
-    @staticmethod
-    def show_image(image):
-        plt.imshow(image)
-        plt.show()
-
-    @staticmethod
-    def scatter_plot(X, Y, C):
-        plt.scatter(X, Y, c=C, cmap='viridis')
-        plt.colorbar()
-        plt.show()
-    
-    @staticmethod
-    def show_2d_array(array):
-        plt.imshow(array, cmap='viridis')
-        plt.colorbar()
-        plt.show()
-    
 class UIHandler:
     def __init__(self):
         self.root = tk.Tk()

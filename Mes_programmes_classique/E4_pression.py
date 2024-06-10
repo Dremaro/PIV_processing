@@ -66,7 +66,7 @@ def find_sonde(X,Y,MP,mp_index,position_relative, i_anchor, Lx, Ly):
 
 
 
-path = r"essais\essai_65Hz_threshold3100\06_1_temporal_mean_as_dat\\"
+path = r"essais\essai_88Hz_threshold3100\01_images_dat\\"
 l_dir = os.listdir(path)
 l_dir = [f for f in l_dir if 'queen2' in f]
 pr_sonde1 = [20,4]    # [x,y] relative position to anchor point in pixels

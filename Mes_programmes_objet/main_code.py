@@ -18,11 +18,11 @@ from NanoFly_Objects import Visualization as Vz
 
 
 raw_im = r"00_rawimages\\"
-path_dossier = r'essais\essai_60Hz_threshold3000'
+# path_dossier = r'essais\essai_60Hz_threshold3000'
 # path_dossier = r'essais\essai_65Hz_threshold3100'
 # path_dossier = r'essais\essai_70Hz_threshold3000'
 # path_dossier = r'essais\essai_73Hz_threshold3000'
-# path_dossier = r'essais\essai_76Hz_threshold3000'
+path_dossier = r'essais\essai_76Hz_threshold3000'
 # path_dossier = r'essais\essai_79Hz_threshold3000'
 # path_dossier = r'essais\essai_82v5Hz_threshold3000'
 # path_dossier = r'essais\essai_82v5Hz_threshold3000_1v1V'
@@ -32,15 +32,32 @@ path_dossier = r'essais\essai_60Hz_threshold3000'
 path = os.path.join(path_dossier, raw_im)
 
 
-create_data = False ; save_session = False     # be careful with the save_session variable, 
-save_data_ii = True                         # it will overwrite the previous saved session if there is one
+# ! Commandes et variables globales
+create_data = True ; save_session = True     # be careful with the save_session variable, 
+save_data_ii = False                         # it will overwrite the previous saved session if there is one
 GD = GestionnaireDonnees(path)
 
 freq_thresh = path_dossier.split('_')[1] + '_' + path_dossier.split('_')[2]
+dico = {
+    "essai_60Hz_threshold3000" : [20,1835],
+    "essai_65Hz_threshold3100" : [10,847],
+    "essai_70Hz_threshold3000" : [15,1182],
+    "essai_73Hz_threshold3000" : [20,1506],
+    "essai_76Hz_threshold3000" : [],
+    "essai_79Hz_threshold3000" : [],
+    "essai_82v5Hz_threshold3000" : [],
+    "essai_82v5Hz_threshold3000_1v1V" : [],
+    "essai_85Hz_threshold3000" : [],
+    "essai_88Hz_threshold3000" : [6,375],
+    "essai_95Hz_threshold3000" : []
+}
 
 
+
+
+# ! 1ère étape : Créer les tableaux de vitesses interpolés
 if create_data:
-    GD.vc7_en_vitesseUV(pourcentage = 1)
+    GD.vc7_en_vitesseUV(pourcentage = 0.5)
     l_U, l_V = GD.l_U, GD.l_V
 
     GD.masked_to_zero(l_U)
@@ -63,27 +80,26 @@ if create_data:
 
     if save_session:
         # sauvegarder les données de la session (attention à ne pas écraser une sauvegarde du même nom)
-        GD.save_session(save_path=path_dossier, name='session_'+freq_thresh+'.db') ; print('session saved')
+        GD.save_session(save_path=path_dossier, name='session_'+freq_thresh+'.db')
 
 
-
-
-info_dico = {60:'2'}
-
-
+# ! 2ème étape : moyenner les images sur une période puis sauvegarder au format dat
 if save_data_ii:
-    
     # Charger les variables et objets sauvegardées dans le fichier .db
     GD.load_session(find_path=path_dossier ,name='session_'+freq_thresh+'.db')  ; print('session loaded')
 
-    # Moyennage des images et des parties mobiles sur le temps
-    IP.mesurer_periode(l_U, show_name=True)
-    print(IP.n_images)
-    print(IP.n_periodes)
+    dico_infos = dico
+    # Récupérer le nombre d'image par période (stocké dans IP.T_mean)
+    experiment = path_dossier.split("\\")[-1]
+    print(experiment)
+    l_info = dico_infos[str(experiment)]
+    IP.mesurer_periode(l_U, l_info, show_name=True)
 
+    # Calculer la période moyenne
     l_U_par_periode , l_mp_U_par_periode = IP.moyenner_les_images_sur_le_temps(l_U, IP.flatten_mp)
     l_V_par_periode , l_mp_V_par_periode = IP.moyenner_les_images_sur_le_temps(l_V, IP.flatten_mp)
 
+    # Visualiser les images moyennées si nécessaire pour vérifier que tout est correct
     root = tk.Tk()
     browser = ImageBrowser(root, l_images = l_U_par_periode, size=500, show_name=True)
     root.mainloop()

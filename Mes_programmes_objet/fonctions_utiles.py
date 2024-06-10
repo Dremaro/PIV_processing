@@ -224,7 +224,8 @@ def index_to_coords(mobile_parts, shape_img):
     return out
 
 def normalize_to_255(array):
-    array_min, array_max = np.min(array), np.max(array)
+    array_min, array_max = np.nanmin(array), np.nanmax(array)   # we need to ignore the nan values
+    print(array_min, array_max)
     normalized_array = ((array - array_min) / (array_max - array_min)) * 255
     return normalized_array.astype(np.uint8)
 
