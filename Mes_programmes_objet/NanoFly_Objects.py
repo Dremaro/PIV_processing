@@ -204,7 +204,7 @@ class ImageProcessing:
     def moyenner_les_images_sur_le_temps(self, l_image, l_mp):
         """Cette fonction permet de moyenner les images sur le temps."""
 
-        #!####### Mise en forme des données ########
+        #!############ Mise en forme des données ##############
         l_images_par_periode = [[]]
         l_mp_par_periode = [[]]
         i_periodes = 0
@@ -321,16 +321,18 @@ class ImageProcessing:
         return np.array(mes_images)
 
     def sauver_MP_au_format_dat(self, mp_periodes_mean, save_path):
+        xy_mp_position = []
         for n in range(len(mp_periodes_mean)):
             mp_data = mp_periodes_mean[n]
-            for point in mp_data:    # on convertit les coordonnées des points en mètre
-                point[0] = point[0]*self.dl
-                point[1] = point[1]*self.dl
-            # X,Y = zip(*mp_data)
-            # plt.scatter(X,Y)
-            # plt.show()
-            np.savetxt(save_path + f'mean_mp_{Fp.numeros_dans_lordre(n,5)}.dat', mp_data, delimiter=',')
+            xy_mp_position = []
+            for point in mp_data:    # on convertit les coordonnées des pixels en mètres
+                a = point[0]*self.dl
+                b = point[1]*self.dl
+                xy_point = [a,b]
+                xy_mp_position.append(xy_point)
+            np.savetxt(save_path + f'mean_mp_{Fp.numeros_dans_lordre(n,5)}.dat', xy_mp_position, delimiter=',')
             # print(f"mean_mp_{Fp.numeros_dans_lordre(i,3)}.dat saved in {save_path_to_dat}")
+        
         print("La position de la partie mobile a été sauvegardées dans le dossier : ", save_path)
         return mp_periodes_mean
 

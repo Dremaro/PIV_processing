@@ -45,6 +45,7 @@ def put_MP_to_nan(X,Y,P,MP):
 
 def find_anchor(X,Y,MP,mp_index):
     x_min_mp = (min(MP, key=lambda x: x[0]))[0]
+    x_max_mp = (max(MP, key=lambda x: x[0]))[0]
     l_x_min_index = []
     for k,el in enumerate(MP):
         i = mp_index[k]
@@ -66,7 +67,8 @@ def find_sonde(X,Y,MP,mp_index,position_relative, i_anchor, Lx, Ly):
 
 
 
-path = r"essais\essai_88Hz_threshold3100\01_images_dat\\"
+path = r"essais\essai_65Hz_threshold3100\01_images_dat\\"
+# path = r"essais\essai_65Hz_threshold3100\06_1_temporal_mean_as_dat\\"
 l_dir = os.listdir(path)
 l_dir = [f for f in l_dir if 'queen2' in f]
 pr_sonde1 = [20,4]    # [x,y] relative position to anchor point in pixels
@@ -82,8 +84,7 @@ l_Y = []
 for n,file in enumerate(l_dir):
     data_pressure = pd.read_csv(path + file, sep=',', header=None)
     data_pressure.columns = ['x', 'y', 'u', 'v', 'dpdx', 'dpdy', 'p', 'abs_p']
-    # data_pressure = data_pressure.sort_values(by=['y', 'x'])
-    # data_pressure = data_pressure.reset_index(drop=True)
+
     X = data_pressure['x'].values
     Y = data_pressure['y'].values
     Lx,Ly = get_shape(X,Y)
