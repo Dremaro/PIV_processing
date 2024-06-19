@@ -2,6 +2,7 @@
 #importation des librairies
 import sys
 sys.path.insert(0, 'C:/Users/pc1/Leviia/Documents/1_Savoir et Apprentissage/Programmation/PythonKnowledge/mes_outils')
+sys.path.insert(0, 'C:/Users/pc1/Leviia/Documents/2_ENS-Paris-Saclay/3A__M2_BME2_IPP/Stage_PMMH/PIV_processing/code/Mes_programmes_objet')
 
 import lvpyio as lv                       # type: ignore
 from lvpyio import read_set, is_multiset  # type: ignore
@@ -22,7 +23,7 @@ import xlsxwriter
 import pandas as pd
 
 import FonctionsPerso as Fp  # type: ignore
-
+from NanoFly_Objects import Visualization as Vz
 
 # params={'legend.fontsize':'20','figure.figsize':(18,10),'axes.labelsize':'20','axes.titlesize':'20','xtick.labelsize':'20','ytick.labelsize':'20'}
 # pylab.rcParams.update(params)
@@ -110,6 +111,9 @@ for ii in tqdm(range(1,Nimage+1)):
     # Lecture des fichiers Lavision    
     buffer = lv.read_buffer(path+filename(ii)+'.vc7')
     ma_arr = buffer.as_masked_array()
+    print(ma_arr["u"].shape)
+    Vz.show_2d_array(ma_arr["u"])
+
     ma_arr_x=ma_arr["u"] # ! Attention il y a une inversion entre u et v, à voir si c'est exprès ou une erreur
     ma_arr_y=ma_arr["v"] # ! Je pense que c'était une erreur, j'ai inversé u et v
     x,y = np.meshgrid(np.arange(ma_arr_x.shape[1]),np.arange(ma_arr_x.shape[0]))
@@ -117,9 +121,9 @@ for ii in tqdm(range(1,Nimage+1)):
     plt.show()
 
     # Sauvegarde des fichier .csv
-    np.savetxt(pathsave+filename(ii)+"_u.csv",ma_arr_x, delimiter=",")
-    np.savetxt(pathsave+filename(ii)+"_v.csv",ma_arr_y, delimiter=",")
-    
+    # np.savetxt(pathsave+filename(ii)+"_u.csv",ma_arr_x, delimiter=",")
+    # np.savetxt(pathsave+filename(ii)+"_v.csv",ma_arr_y, delimiter=",")
+
 
 
 

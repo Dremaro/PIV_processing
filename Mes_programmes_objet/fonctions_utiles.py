@@ -20,6 +20,7 @@ from FonctionsPerso import ImageBrowser # type: ignore
 
 
 
+
 def compter_voisins_communiquant(data_csv, i, j, l_voisins):
     '''
     Cette fonction recursive permet de compter le nombre de voisins nuls communiquant avec la case (i,j)
@@ -231,7 +232,179 @@ def normalize_to_255(array):
 
 
 
+def numeros_dans_lordre(i,odg):
+    """Cette fonction renvoie un nombre avec un nombre de chiffres 
+    valant odg en ajoutant des zéros à gauche si nécessaire.
 
+    Args:
+        i (int): numéro que l'on souhaite modifier
+        odg (int): Nombre de chiffre totale à obtenir
+
+    Returns:
+        string: nombre remplieavec des zéros à gauche
+    """
+    for k in range(1,odg+1):
+        if i<10**k:
+            return (odg-k)*'0' + str(i)
+
+
+
+
+
+################# FONCTIONS POUR LA PRESSION ########################################
+
+def get_shape(X,Y):
+    Lx = len(np.unique(X))
+    Ly = len(np.unique(Y))
+    return Lx, Ly
+
+def parties_mobiles(n_x,n_y,P,grad_P):
+    MP = []
+    for i in range(n_x):
+        for j in range(n_y):
+            if np.isnan(P[i][j]): #or np.isnan(grad_P[0][i][j]) or np.isnan(grad_P[1][i][j]):
+                MP.append([j,i])
+    return MP
+
+def put_MP_to_nan(X,Y,P,MP):
+    for i in range(len(X)):
+        if [X[i], Y[i]] in MP:
+            P[i] = np.nan
+    return P
+
+def find_anchor(X,Y,MP,mp_index):
+    x_min_mp = (min(MP, key=lambda x: x[0]))[0]
+    x_max_mp = (max(MP, key=lambda x: x[0]))[0]
+    l_x_min_index = []
+    for k,el in enumerate(MP):
+        i = mp_index[k]
+        if el[0] == x_min_mp:
+            l_x_min_index.append(i)
+
+    y_max = -100000 ; i_anchor = 0
+    for index in l_x_min_index:
+        if Y[index] > y_max:
+            y_max = Y[index]
+            i_anchor = index
+    
+    return i_anchor
+
+def find_sonde(X,Y,MP,mp_index,position_relative, i_anchor, Lx, Ly):
+    x_anchor = X[i_anchor]
+    y_anchor = Y[i_anchor]
+
+def distance(p1, p2):
+    return np.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)
+
+
+#### Ajouts pour la pression ####	
+
+
+
+def voisinnage(image, i, j, large=False):
+    '''
+    Cette fonction renvoie les coordonnées des pixels voisins du pixel (i,j) dans l'image
+    Si large est à True, on renvoie les 8 voisins, sinon on renvoie les 4 voisins directs
+    On prend soin d'ajouter en premier les 4 voisins proches en premier pour que le parcour
+    du contour soit automatiquement trié.
+    '''
+    voisins = []
+    dims = len(image.shape)
+    h, w = image.shape[0], image.shape[1]  # works for both grayscale and color images
+    if dims == 3:
+        l = image.shape[2]
+
+    # Check the four close neighbors first
+    if i > 0: voisins.append((i-1, j))  # Up
+    if j > 0: voisins.append((i, j-1))  # Left
+    if i < h-1: voisins.append((i+1, j))  # Down
+    if j < w-1: voisins.append((i, j+1))  # Right
+
+    # If large is True, check the four diagonal neighbors
+    if large:
+        if i > 0 and j > 0: voisins.append((i-1, j-1))  # Up-Left
+        if i > 0 and j < w-1: voisins.append((i-1, j+1))  # Up-Right
+        if i < h-1 and j > 0: voisins.append((i+1, j-1))  # Down-Left
+        if i < h-1 and j < w-1: voisins.append((i+1, j+1))  # Down-Right
+
+    return voisins
+
+
+
+def is_in_contour(image, i, j, large = True):
+    '''
+    Cette fonction permet de savoir si un pixel est dans le contour d'un nevus
+    On regarde les voisins, si un voisin est noir ou que le pixel est sur le bord de l'image,
+    alors le pixel est dans le contour.
+    '''
+    pixel = list(image[i,j])
+    if (pixel != [0,0,0]) :
+        voisins = voisinnage(image, i, j, large=large)
+        # On vérifie que si le pixel est sur le bord de l'image en regardant le nombre de voisins (dépend de large)
+        if large:
+            if len(voisins) < 8:
+                return True
+        else :
+            if len(voisins) < 4:
+                return True
+        
+        for voisin in voisins:
+            # On regarde si le voisin est noir
+            if (list(image[voisin[0],voisin[1]]) == [0,0,0]) :
+                return True
+    return False
+
+def contourner(image, i, j, contour):
+    '''
+    Cette fonction récursive permet de contourner un nevus
+    '''
+    voisins = voisinnage(image, i, j, large=True)
+    to_check = []
+    for voisin in voisins:
+        i_v, j_v = voisin
+        if (voisin not in contour)    and    (list(image[i_v,j_v]) != [0,0,0])    and    (is_in_contour(image, i_v, j_v,large=False)):
+            contour.append((i_v, j_v))  # on ajoute le pixel au contour (on inverse les coordonnées pour avoir (i,j) et non (j,i) comme dans les images)
+            contourner(image, i_v, j_v, contour)
+    return contour
+
+def contour_mp(image, nevus):
+    contour = []
+    for i in nevus[0]:
+        for j in nevus[1]:
+            if list(image[i,j]) != [0,0,0]: # on trouve le premier pixel coloré, il appartient forcement au contour
+                contour.append((i,j))
+            if len(contour) > 0:            # dès qu'on a trouvé le premier élément, on entame le contournement
+                contour = contourner(image, i, j, contour) # on entre dans la fonction récursive
+                return contour
+
+def contour_naif(image, nevus):
+    '''Trop long'''
+    contour = []
+    m = len(image)
+    n = len(image[0])
+    for i in range(m):
+        for j in range(n):
+            if is_in_contour(image, i, j, large1=False):
+                contour.append((i,j))
+    return contour
+
+def contour_nevus(image, nevus):
+    contour = []
+    for i in nevus[0]:
+        for j in nevus[1]:
+            if list(image[i,j]) != [0,0,0]: # on trouve le premier pixel coloré, il appartient forcement au contour
+                contour.append((i,j))
+            if len(contour) > 0:            # dès qu'on a trouvé le premier élément, on entame le contournement
+                contour = contourner(image, i, j, contour) # on entre dans la fonction récursive
+                return contour
+
+def get_contour(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = gray.astype(np.uint8)
+    contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    # contours_tuples = [[(point[0][1],point[0][0]) for point in contour] for contour in contours]
+    
+    return contours[0]
 
 
 

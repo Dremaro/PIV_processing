@@ -6,6 +6,7 @@ import sys
 import dill
 from tqdm import tqdm
 import copy
+from math import *
 
 sys.path.insert(0, 'C:/Users/pc1/Leviia/Documents/1_Savoir et Apprentissage/Programmation/PythonKnowledge/mes_outils')
 # sys.path is a list
@@ -14,6 +15,7 @@ import lvpyio as lv                       # type: ignore
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as plc
+import matplotlib.animation as animation
 import pandas as pd
 import fonctions_utiles as Fu
 import scipy as sp
@@ -26,7 +28,7 @@ from tkinter import filedialog
 from PIL import Image, ImageTk
 
 import FonctionsPerso as Fp              # type: ignore
-
+         
 
 
 
@@ -108,7 +110,6 @@ class GestionnaireDonnees:
             dill.dump_session('session.db')
             print(f"Session saved in {save_path} as session.db")
 
-
 class ImageProcessing:
     """Permet de faire tout les traitements d'image nécessaire, notamment :
     - Interpolation des trous dans les images de vitesse u et v
@@ -120,13 +121,15 @@ class ImageProcessing:
             l_U (liste d'array): liste les tableau de vitesse u
             l_V (liste d'array): liste les tableau de vitesse v
     """
-    
-    def __init__(self, l_U, l_V):
+    def __init__(self, l_U, l_V, dl = 0.178e-3):
         self.ratio_pixel_mm = 7.3/41 # = 0.178 en mm/pixel7
-        self.dl = 0.178e-3  # en m
+        self.dl = dl  # en m
         self.vitesses = [[u, v] for u, v in zip(l_U, l_V)] # liste de listes de tableaux de vitesses u et v
+        self.l_U_i = []
+        self.l_V_i = []
         self.l_mobile_parts = []
         self.flatten_mp = []
+        self.coeffs = []
 
     def interpolation_trous(self, critical_size=10):
         """Cette fonction permet de repérer les trous qui ne sont pas des pièces mobiles
@@ -142,10 +145,10 @@ class ImageProcessing:
         for i,vitesse in tqdm(enumerate(self.vitesses)):
             l_mp_uv = []
             vitesses_interpolees.append([])
-            for j,uv in enumerate(vitesse):
+            for j,vit in enumerate(vitesse):
+
                 # on retire les bords
-                uv = uv[1:-1,1:-1]
-                # print(uv)
+                uv = vit[2:-2,2:-2]  # (premier bord null, deuxième bord de mauvaise qualité donc 2:-2)
 
                 # repérer les trous
                 l_trous, mobile_parts = Fu.reperer_trous(uv, critical_size) # repère les trous et les pièces mobiles (gros trous : size > critical_size)
@@ -290,6 +293,48 @@ class ImageProcessing:
         return l_mp_par_periode_mean
 
 
+    def reparer_mp(self, mean_periode, l=0):
+        max_length = 0
+
+        # On commence par trouver la longueur maximale, pour avoir la longueur de la partie mobile
+        for mp in mean_periode:
+            x, y = zip(*mp)
+            x = np.array(x)
+            x_min = min(x)
+            x_max = max(x)
+            if x_max - x_min > max_length:
+                max_length = x_max - x_min
+
+        l_repared_mp = []
+        for mp in mean_periode:
+            x, y = zip(*mp)
+            x = np.array(x) ; y = np.array(y)
+            x_min = min(x)
+
+            coeff = np.polyfit(x, y, 1)
+            poly_y = np.polyval(coeff, x)
+            std = np.std(y - poly_y)
+            ecart_to_droite = 2   # round(std) + l
+            if ecart_to_droite == 0:
+                ecart_to_droite = 1
+            self.coeffs.append(coeff)
+
+            artificel_mp_points = []
+            for i in range(x_min, x_min + max_length - 1):
+                y_droite = np.polyval(coeff, i)
+                for j in range(-ecart_to_droite, ecart_to_droite):
+                    h = round(y_droite) # obtenir la hauteur en pixels
+                    artificel_mp_points.append([i, h + j])
+
+            artificel_mp_points = np.array(artificel_mp_points)
+            mp_reparee = np.vstack((mp, artificel_mp_points))
+            mp_reparee = np.unique(mp_reparee, axis=0)
+
+            l_repared_mp.append(mp_reparee)
+
+        return l_repared_mp
+
+
     def sauver_UV_au_format_dat(self, UandVperiodes_mean, save_path):
         U_periodes_mean, V_periodes_mean = UandVperiodes_mean
         mes_images = []
@@ -314,7 +359,7 @@ class ImageProcessing:
             speed_data = np.column_stack((x_position, y_position, u_speed, v_speed))
 
             # Save the data to a .dat file
-            np.savetxt(save_path + f'mean_speed_{Fp.numeros_dans_lordre(n,5)}.dat', speed_data, delimiter=',')
+            np.savetxt(save_path + f'mean_speed_{Fu.numeros_dans_lordre(n,5)}.dat', speed_data, delimiter=',')
             # print(f"mean_speed_{Fp.numeros_dans_lordre(n,3)}.dat saved in {save_path_to_dat}")
             mes_images.append(speed_data)
         print("Les données de vitesse UV ont été sauvegardées dans le dossier : ", save_path)
@@ -330,31 +375,100 @@ class ImageProcessing:
                 b = point[1]*self.dl
                 xy_point = [a,b]
                 xy_mp_position.append(xy_point)
-            np.savetxt(save_path + f'mean_mp_{Fp.numeros_dans_lordre(n,5)}.dat', xy_mp_position, delimiter=',')
+            max_b = max([point[1] for point in xy_mp_position])
+            np.savetxt(save_path + f'mean_mp_{Fu.numeros_dans_lordre(n,5)}.dat', xy_mp_position, delimiter=',')
             # print(f"mean_mp_{Fp.numeros_dans_lordre(i,3)}.dat saved in {save_path_to_dat}")
         
         print("La position de la partie mobile a été sauvegardées dans le dossier : ", save_path)
         return mp_periodes_mean
 
+    def compute_vorticity(self, U, V):
+        dUdx, dUdy = np.gradient(U, self.dl)
+        dVdx, dVdy = np.gradient(V, self.dl)
+        return dVdx - dUdy
+
 
 class Visualization:
     @staticmethod
-    def show_image(image):
+    def show_image(image, cb = False, show=True):
         plt.imshow(image)
-        plt.show()
+        if show:
+            plt.show()
 
     @staticmethod
-    def scatter_plot(X, Y, C):
+    def scatter_plot(X, Y, C=None, show = True, cb=False):
         plt.scatter(X, Y, c=C, cmap='viridis')
-        plt.colorbar()
-        plt.show()
+        if cb:
+            plt.colorbar()
+        if show:
+            plt.show()
     
     @staticmethod
-    def show_2d_array(array):
+    def show_2d_array(array, show=True, cb = False):
         plt.imshow(array, cmap='viridis')
-        plt.colorbar()
-        plt.show()
+        if cb:
+            plt.colorbar()
+        if show:
+            plt.show()
     
+    @staticmethod
+    def vector_plot(X, Y, U, V, show=True, color=None, cb=False):
+        plt.quiver(X, Y, U, V, color=color)
+        if cb:
+            plt.colorbar()
+        if show:
+            plt.show()
+    
+    @staticmethod
+    def animate_images(l_images, save_dir = None, show=True, save_as='animation.mp4'):
+
+        # Initialize a figure and axis for the animation
+        fig, ax = plt.subplots()
+        cmap = plt.cm.viridis
+        cmap.set_bad(color='white')
+
+        im = [None]
+
+        # Define the init function for the animation
+        def init():
+            image = np.ma.array(l_images[0], mask=np.isnan(l_images[0]))
+            im[0] = ax.imshow(image, cmap=cmap)
+            return [im[0]]
+
+        # Define the update function for the animation
+        def update(i):
+            image = np.ma.array(l_images[i], mask=np.isnan(l_images[i]))
+            im[0].set_array(image)
+            return [im[0]]
+
+        # Create the animation
+        ani = animation.FuncAnimation(fig, update, interval=20, frames=len(l_images), init_func=init, blit=True)
+
+        # Save the animation
+        if save_dir is not None:
+            os.makedirs(save_dir, exist_ok=True)
+            save_as = os.path.join(save_dir, save_as)
+            ani.save(save_as, writer='ffmpeg')
+
+        # Show the animation
+        if show:
+            plt.show()
+
+    @staticmethod
+    def plot_forces(self, t, L_Fx, L_Fy, L_M, show=True, save_dir=None, save_as='efforts.png'):
+        plt.plot(t, L_Fx, color='r', label='Force X')
+        plt.plot(t, L_Fy, color='orange', label='Force Y')
+        plt.plot(t, L_M, color='b', label='Moment')
+        plt.xlabel('Temps (s)')
+        plt.grid()
+        plt.legend()
+        if save_dir is not None:
+            os.makedirs(save_dir, exist_ok=True)
+            save_as = os.path.join(save_dir, save_as)
+            plt.savefig(save_as)
+        if show:
+            plt.show()
+
 
 class ImageBrowser:
     '''
@@ -492,92 +606,138 @@ class ImageBrowser:
                 self.name_label.config(text="indice n°"+str(self.index))
 
 
+class PressureFieldAnalyser:
+    def __init__(self, path, key='queen2', dl=0.178e-3):
+        """gather output data of the matlab program in the following columns
+        x (m),  y (m),  u (m/s),  v (m/s),  dp/dx (Pa/m),  dp/dy (Pa/m),  p (Pa),  |p| (Pa)
 
-class MobilePartProcessing:
-    def __init__(self, folder_path, threshold=0.3):
-        self.folder_path = folder_path
-        self.threshold = threshold
-        self.mobile_parts = self.load_mobile_parts()
+        Args:
+            path (string): path to the folder containing the data
+            keyword (str, optional): string that's inside every file name of interest. Defaults to 'queen2'.
+        """
+        self.dl = dl
+        self.l_dir = os.listdir(path)
+        self.l_path = [os.path.join(path, f) for f in self.l_dir if key in f]
+        if len(self.l_path) == 0:
+            print(f"No file with the keyword '{key}' found in the folder {path}")
+        self.time = []
+        self.l_X = []
+        self.l_Y = []
+        self.l_U = []
+        self.l_V = []
+        self.l_P = []
+        self.l_dPdx = []
+        self.l_dPdy = []
+        self.extraire_donnees() # conversion en tableaux 2D
+        self.l_grad_P = list(zip(self.l_dPdx, self.l_dPdy))
+        self.l_MP = []
+        for i in range(len(self.l_P)):
+            n_x_i = len(self.l_X[i])
+            n_y_i = len(self.l_Y[i])
+            MP = Fu.parties_mobiles(n_x_i, n_y_i, self.l_P[i], self.l_grad_P[i])
+            self.l_MP.append(MP)
+        print("Initialisation done")
 
-    def load_mobile_parts(self):
-        mobile_parts = []
-        for file_name in os.listdir(self.folder_path):
-            file_path = os.path.join(self.folder_path, file_name)
-            data = pd.read_csv(file_path, sep=',').values.tolist()
-            mobile_parts.append(data)
-        return mobile_parts
+    def extraire_donnees(self): 
+        for n,path in enumerate(tqdm(self.l_path)):
+            data_pressure = pd.read_csv(path, sep=',', header=None)
+            data_pressure.columns = ['x', 'y', 'u', 'v', 'dpdx', 'dpdy', 'p', 'abs_p']
+            X = data_pressure['x'].values
+            Y = data_pressure['y'].values
+            X = np.unique(X)  ;   n_x = len(X)
+            Y = np.unique(Y)  ;   n_y = len(Y)
+            tab_P = np.zeros((n_x, n_y))
+            tab_U = np.zeros((n_x, n_y))
+            tab_V = np.zeros((n_x, n_y))
+            tab_dPdx = np.zeros((n_x, n_y))
+            tab_dPdy = np.zeros((n_x, n_y))
 
-    def calculate_mean_mobile_parts(self, periods):
-        # Implement your mean calculation logic here
-        pass
+            # On remplis les tableaux 2D
+            for index, row in data_pressure.iterrows():
+                j = np.where(X == row['x'])[0][0] # on constitue le tableau contenant les indices des x et on prend le premier élément
+                i = np.where(Y == row['y'])[0][0] 
+                i = n_y - i - 1                   # on inverse l'axe y pour avoir l'origine en bas à gauche
+                tab_P[i,j] = row['p']
+                tab_U[i,j] = row['u']
+                tab_V[i,j] = row['v']
+                tab_dPdx[i,j] = row['dpdx']
+                tab_dPdy[i,j] = row['dpdy']
+            
+            self.l_X.append(X)
+            self.l_Y.append(Y)
+            self.l_P.append(tab_P)
+            self.l_dPdx.append(tab_dPdx)
+            self.l_dPdy.append(tab_dPdy)
+            self.time.append(n*1.80e-4)
 
-    def save_mobile_parts(self, save_path, mobile_parts):
-        os.makedirs(save_path, exist_ok=True)
-        for i, part in enumerate(mobile_parts):
-            np.savetxt(os.path.join(save_path, f'mean_mobile_part_{i}.csv'), part, delimiter=',')
+    def calculer_force(self, X, Y, P, MP):
+        ### D'abord on trouve le contour de la partie mobile ###
+        centre = [0,0] ; perimetre = 0
+        contour = []
+        for k, p_mp in enumerate(MP):
+            [i,j] = p_mp
+            voisins = Fu.voisinnage(P, i,j, large = False)
+            for voisin in voisins:
+                P_voisin = P[voisin[1], voisin[0]]
+                if not isnan(P_voisin) and (voisin not in contour):
+                    centre[0] += i ; centre[1] += j ; perimetre += 1
+                    contour.append(voisin)                   # on obtient ainsi le contour extérieur de la partie mobile
+        centre = [centre[0]/perimetre, centre[1]/perimetre]  # on obtient le centre de la partie mobile pour le calcul des moments
+        distances = [Fu.distance(centre, point) for point in contour]
 
-class UIHandler:
-    def __init__(self):
-        self.root = tk.Tk()
+        ### On calcule les forces locales et leurs directions ###
+        forces_locales = []
+        for point in contour:
+            f = [0,0]
+            [i,j] = point
+            voisins = Fu.voisinnage(P, i,j, large = False)
+            # On cherche la direction de la force air --> pièce mobile
+            for k,voisin in enumerate(voisins):
+                if isnan(P[voisin[1], voisin[0]]):
+                    if k==0:
+                        f[0]-=1  # si un pixel de pièce mobile est à gauche, composante x négative
+                    if k==2:
+                        f[0]+=1  # si un pixel de pièce mobile est à droite, composante x positive
+                    if k==1:
+                        f[1]+=1  # si un pixel de pièce mobile est en haut, composante y positive
+                    if k==3:
+                        f[1]-=1  # si un pixel de pièce mobile est en bas, composante y négative
+            # On calcule la force
+            norme = sqrt(f[0]**2 + f[1]**2)
+            Intensite = P[j,i]*self.dl/norme
+            f = [Intensite*f[0], Intensite*f[1]]
+            forces_locales.append(f)
+        
+        ### On intègre pour calculer les efforts totaux ###
+        Resultante = [0,0]
+        Moment = 0
+        for k,point in enumerate(contour):
+            f = forces_locales[k]
+            d = distances[k]
+            Resultante[0] += f[0]
+            Resultante[1] += f[1]
 
-    def show_image_browser(self, folder_path):
-        browser = Fp.ImageBrowser(self.root, folder_path)
-        self.root.mainloop()
+            theta = atan2(point[1]-centre[1], point[0]-centre[0])
+            f_ortho = f[1]*cos(theta) - f[0]*sin(theta)
+            Moment += f_ortho*d
 
-
-
-
-def main():
-    # Initialize data and processing objects
-    experiment_data = ExperimentData(d_infos["essai_65Hz_threshold3100"])
-    img_proc = ImageProcessing(folder65Hz_U)
-    mp_proc = MobilePartProcessing(folder65Hz_MP)
-
-    # Process data
-    U_mean_images = img_proc.calculate_mean_images(experiment_data.periods)
-    mean_mobile_parts = mp_proc.calculate_mean_mobile_parts(experiment_data.periods)
-
-    # Save results
-    img_proc.save_images(save_path, U_mean_images)
-    mp_proc.save_mobile_parts(save_mp_to_dat, mean_mobile_parts)
-
-    # Visualize results
-    Visualization.show_image(U_mean_images[0])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    # def load_images(self):
-    #     images = []
-    #     for file_name in os.listdir(self.folder_path):
-    #         file_path = os.path.join(self.folder_path, file_name)
-    #         data = pd.read_csv(file_path, sep=',').to_numpy()
-    #         images.append(data)
-    #     return images
+        return Resultante, Moment, centre, contour, forces_locales
     
-    # def load_vc7_data(self):
-    #     fields = []
 
-    # def calculate_mean_images(self, periods):
-    #     # Implement your mean calculation logic here
-    #     pass
 
-    # def save_images(self, save_path, images):
-    #     os.makedirs(save_path, exist_ok=True)
-    #     for i, image in enumerate(images):
-    #         np.savetxt(os.path.join(save_path, f'mean_image_{i}.csv'), image, delimiter=',')
+        
+
+            
+
+            
+        
+        
+
+
+
+
+
+
 
 
 if __name__ == "__main__":

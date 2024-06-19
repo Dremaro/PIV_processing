@@ -4,7 +4,9 @@ Fichier de traitement des CSV donnée en output par le script P1_creation_csv.py
 import os
 import sys
 sys.path.insert(0, 'C:/Users/pc1/Leviia/Documents/1_Savoir et Apprentissage/Programmation/PythonKnowledge/mes_outils')
+sys.path.insert(0, 'C:/Users/pc1/Leviia/Documents/2_ENS-Paris-Saclay/3A__M2_BME2_IPP/Stage_PMMH/PIV_processing/code/Mes_programmes_objet')
 # sys.path is a list
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,6 +18,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 
 from FonctionsPerso import ImageBrowser # type: ignore
+from NanoFly_Objects import Visualization as Vz
 
 ################################## FONCTIONS ################################################################################################################################################
 #############################################################################################################################################################################################
@@ -217,13 +220,17 @@ input_csvs = os.listdir(path_csv_rawcsv)
 
 
 
+
 ################## ! Boucle de traitement principale ############################
 last_u_speed = []  # permet de garder en mémoire un fichier sur l'autre
 id=0
 for file in tqdm(input_csvs):
     ################# CONVERTIR EN ARRAY ##########
-    datafram_csv = pd.read_csv(path_csv_rawcsv + file, sep=',') # lie le fichier csv
-    data_csv = datafram_csv.values[1:-1,1:-1]                   # convertit en array et enlève les bords (qui sont nulls ici)
+    datafram_csv = pd.read_csv(path_csv_rawcsv + file, sep=',', header=None) # lie le fichier csv
+    data_csv = datafram_csv.values[2:-2,2:-2]                   # convertit en array et enlève les bords (qui sont nulls ici)
+
+    print(data_csv.shape)
+    Vz.show_2d_array(data_csv)
 
     #region ########## REPERER LES TROUS ##########
     l_trous, mobile_parts = reperer_trous(data_csv, critical_size=15) # repère les trous et les pièces mobiles (gros trous : size > critical_size)
