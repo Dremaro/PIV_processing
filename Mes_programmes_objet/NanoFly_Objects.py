@@ -13,9 +13,6 @@ sys.path.insert(0, 'C:/Users/pc1/Leviia/Documents/1_Savoir et Apprentissage/Prog
 
 import lvpyio as lv                       # type: ignore
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as plc
-import matplotlib.animation as animation
 import pandas as pd
 import fonctions_utiles as Fu
 import scipy as sp
@@ -25,6 +22,10 @@ import cv2
 import time
 import tkinter as tk
 from tkinter import filedialog
+import matplotlib.pyplot as plt
+import matplotlib.colors as plc
+import matplotlib.animation as animation
+import matplotlib.ticker as ticker
 from PIL import Image, ImageTk
 
 import FonctionsPerso as Fp              # type: ignore
@@ -32,7 +33,7 @@ import FonctionsPerso as Fp              # type: ignore
 
 
 
-######################################### OBJECTS ############################################################
+######################################### OBJETS #############################################################
 ##############################################################################################################
 
 class GestionnaireDonnees:
@@ -396,10 +397,12 @@ class Visualization:
             plt.show()
 
     @staticmethod
-    def scatter_plot(X, Y, C=None, show = True, cb=False):
-        plt.scatter(X, Y, c=C, cmap='viridis')
-        if cb:
-            plt.colorbar()
+    def scatter_plot(X, Y, label_vect=None, C=None, show = True):
+        if label_vect is not None:
+            plt.scatter(X, Y, c=C, cmap='viridis', label=label_vect)
+        else :
+            plt.scatter(X, Y, c=C, cmap='viridis')
+        
         if show:
             plt.show()
     
@@ -412,8 +415,11 @@ class Visualization:
             plt.show()
     
     @staticmethod
-    def vector_plot(X, Y, U, V, show=True, color=None, cb=False):
-        plt.quiver(X, Y, U, V, color=color)
+    def vector_plot(X, Y, U, V, label_vect=None, show=True, color=None, cb=False):
+        if label_vect is not None:
+            plt.quiver(X, Y, U, V, color=color, label=label_vect)
+        else:
+            plt.quiver(X, Y, U, V, color=color)
         if cb:
             plt.colorbar()
         if show:
@@ -425,7 +431,7 @@ class Visualization:
         # Initialize a figure and axis for the animation
         fig, ax = plt.subplots()
         cmap = plt.cm.viridis
-        cmap.set_bad(color='white')
+        cmap.set_bad(color='black')
 
         im = [None]
 
@@ -455,13 +461,21 @@ class Visualization:
             plt.show()
 
     @staticmethod
-    def plot_forces(self, t, L_Fx, L_Fy, L_M, show=True, save_dir=None, save_as='efforts.png'):
-        plt.plot(t, L_Fx, color='r', label='Force X')
-        plt.plot(t, L_Fy, color='orange', label='Force Y')
-        plt.plot(t, L_M, color='b', label='Moment')
-        plt.xlabel('Temps (s)')
-        plt.grid()
-        plt.legend()
+    def plot_forces(t, L_Fx, L_Fy, L_M, show=True, save_dir=None, save_as='efforts.png'):
+        fig, ax = plt.subplots()
+
+        ax.plot(t, L_Fx, color='r', label='Force X')
+        ax.plot(t, L_Fy, color='orange', label='Force Y')
+        ax.plot(t, L_M, color='b', label='Moment')
+        ax.set_xlabel('Temps (s)')
+
+        # Définir le nombre de graduations sur les axes
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(base=0.002))  # Pour l'axe des x
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(base=0.005))  # Pour l'axe des y
+
+        ax.set_title("Efforts globaux exercé sur l'aile")
+        ax.grid()
+        ax.legend()
         if save_dir is not None:
             os.makedirs(save_dir, exist_ok=True)
             save_as = os.path.join(save_dir, save_as)
@@ -725,11 +739,17 @@ class PressureFieldAnalyser:
     
 
 
-        
 
             
+class LObjetUnique:
+    """
+    Un objet pour les gouverner tous.
+    Un objet pour les trouver.
+    Un objet pour les amener tous et dans les ténèbres, les lier.
+    """
 
-            
+    def __init__(self, path):
+        variable = 0
         
         
 

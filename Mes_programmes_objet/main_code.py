@@ -1,6 +1,7 @@
 
 import os
 import sys
+import pickle
 sys.path.insert(0, 'C:/Users/pc1/Leviia/Documents/1_Savoir et Apprentissage/Programmation/PythonKnowledge/mes_outils')
 
 import numpy as np
@@ -28,18 +29,18 @@ raw_im = r"00_rawimages\\"
 # path_dossier = r'essais\essai_73Hz_threshold3000'
 # path_dossier = r'essais\essai_76Hz_threshold3000'
 # path_dossier = r'essais\essai_79Hz_threshold3000'
-path_dossier = r'essais\essai_82v5Hz_threshold3000'
+# path_dossier = r'essais\essai_82v5Hz_threshold3000'
 # path_dossier = r'essais\essai_82v5Hz_threshold3000_1v1V'
 # path_dossier = r'essais\essai_85Hz_threshold3000'
 # path_dossier = r'essais\essai_88Hz_threshold3000'
-# path_dossier = r'essais\essai_95Hz_threshold3000'
+path_dossier = r'essais\essai_95Hz_threshold3000'
 path = os.path.join(path_dossier, raw_im)
 
 
 # ! Commandes et variables globales
-create_data = 0 ; save_session = 0     # be careful with the save_session variable, 
-save_data_ii = 1                       # it will overwrite the previous saved session if there is one
-comput_pressure_ii = 1
+create_data = 0 ; save_session = 1     # be careful with the save_session variable, 
+save_data_ii = 0                       # it will overwrite the previous saved session if there is one
+comput_pressure_i = 1
 GD = GestionnaireDonnees(path)
 
 freq_thresh = path_dossier.split('_')[1] + '_' + path_dossier.split('_')[2]
@@ -56,7 +57,6 @@ dico = {
     "essai_88Hz_threshold3000" : [6,375],
     "essai_95Hz_threshold3000" : [18,1042]
 }
-
 
 
 
@@ -126,9 +126,8 @@ if save_data_ii:
 
 # ! 4ème étape : traîter le champs de pression puis calculer les forces de poussées 
 
-if comput_pressure_ii:
+if comput_pressure_i:
     GD.load_session(find_path=path_dossier ,name='session_pressure_analysis.db')
-
     Vz.animate_images(PFA.l_P, save_dir=path_dossier, save_as='pressure_field.mp4')
 
     #region : test
@@ -136,8 +135,16 @@ if comput_pressure_ii:
     X = PFA.l_X[n]
     Y = PFA.l_Y[n]
     P = PFA.l_P[n]
+    p_sans_nan = P[~np.isnan(P)]
+    p_max = np.max(p_sans_nan)
+    p_min = np.min(p_sans_nan)
     MP = np.array(PFA.l_MP[n])
 
+    # Vz.show_2d_array(P, show=False)
+    # plt.title('Pressure field 82x82')
+    # plt.colorbar()
+    # plt.text(0, 90, 'Max : {} Pa  ;  Min : {} Pa'.format(p_max, p_min), color='black', fontsize=12)
+    # plt.show()
 
     F, M, centre, contour, forces_locales = PFA.calculer_force(X,Y,P, MP)
     contour = np.array(contour)
@@ -146,12 +153,15 @@ if comput_pressure_ii:
     print('Force calculated : ', F)
     print('Moment calculated : ', M)
 
-    # Vz.show_2d_array(P, show=False)
-    # Vz.scatter_plot(MP[:,0], MP[:,1] , show=False)
-    # Vz.scatter_plot(contour[:,0], contour[:,1], show=False)
-    # Vz.scatter_plot(centre[0], centre[1], show=False)
-    # Vz.vector_plot(contour[:,0], contour[:,1], forces_locales[:,0], forces_locales[:,1], show=False)
-    # Vz.vector_plot(centre[0], centre[1], F[0], F[1], color='r', show=True)
+    Vz.show_2d_array(P, show=False)
+    Vz.scatter_plot(MP[:,0], MP[:,1] , show=False)
+    Vz.scatter_plot(contour[:,0], contour[:,1], show=False, label_vect='Contour')
+    Vz.scatter_plot(centre[0], centre[1], show=False, label_vect='Centre')
+    Vz.vector_plot(contour[:,0], contour[:,1], forces_locales[:,0], forces_locales[:,1], show=False, label_vect='Forces locales')
+    Vz.vector_plot(centre[0], centre[1], F[0], F[1], color='r', show=False, label_vect='Force totale')
+    plt.title('Pressure forces and moments')
+    plt.legend()
+    plt.show()
     #endregion
 
     L_Fx = []
@@ -163,7 +173,18 @@ if comput_pressure_ii:
         L_Fy.append(F[1])
         L_M.append(M)
     
-    Vz.plot_forces(PFA.time, L_Fx, L_Fy, L_M)
+    Vz.plot_forces(PFA.time, L_Fx, L_Fy, L_M, save_dir=path_dossier)
+
+    # L_forces = []
+
+    # with open('F_x.pkl', 'rb') as f:
+    #     print('loading forces...')
+    #     L_forces = pickle.load(f)
+
+    # L_forces.append(L_Fx)
+
+    # with open('F_x.pkl', 'wb') as f:
+    #     pickle.dump(L_forces, f)
 
 
 
