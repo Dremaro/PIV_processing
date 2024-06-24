@@ -164,6 +164,9 @@ if comput_pressure_i:
     plt.show()
     #endregion
 
+
+    
+
     L_Fx = []
     L_Fy = []
     L_M = []
