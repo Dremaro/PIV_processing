@@ -51,6 +51,9 @@ class GestionnaireDonnees:
         self.l_U = []
         self.l_V = []
 
+    def __repr__(self):
+        return f"Bonjouuuuur, je suis un gestionnaire de données pour l'expérience PIV."
+    
     def vc7_en_vitesseUV(self, pourcentage=1):
         """
         Cette méthode permet de convertir les fichiers .vc7 en fichiers .csv

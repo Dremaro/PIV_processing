@@ -38,7 +38,7 @@ path = os.path.join(path_dossier, raw_im)
 
 
 # ! Commandes et variables globales
-create_data = 1 ; save_session = 1     # be careful with the save_session variable, 
+create_data = 0 ; save_session = 1     # be careful with the save_session variable, 
 save_data_ii = 1                       # it will overwrite the previous saved session if there is one
 comput_pressure_i = 0
 GD = GestionnaireDonnees(path)
