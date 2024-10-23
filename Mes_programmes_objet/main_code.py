@@ -189,7 +189,7 @@ if comput_pressure_i:
 
 
 
-
+print("lolilol le programme est fini")
 
 
 
